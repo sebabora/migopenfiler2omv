@@ -15,6 +15,11 @@ def list_files(startpath):
             print('{}{}'.format(subindent, f))
 
 def main():
+    startpath = "/home/sborawski/"
+    if not startpath:
+        print("Please give path to copy of openfiler system")
+        exit(1)
+
 
 
     
