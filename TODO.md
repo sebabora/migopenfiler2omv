@@ -1,8 +1,10 @@
 # Migration tool for old file server system called openfiler to newer openmediavault
 
+### Where to start ?
+- [ ] current prepare user list for creation on new system
 ### Things to do:
 - [ ] Implement necessery switches source path, destination path, assuming that the software will be run on destination system
-- [ ] Prepare user list for creatioin on new system
+- [ ] Prepare user list for creation on new system
     - [ ] retrive users form old system
     - [ ] create white and black user list (list of active and inactive users)
     - [ ] decrypt or provide password list

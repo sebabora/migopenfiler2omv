@@ -1,4 +1,4 @@
-# Copyright: (c) 2019, Jordan Borean (@jborean93) <jborean93@gmail.com>
+Copyright: (c) 2019, Jordan Borean (@jborean93) <jborean93@gmail.com>
 # MIT License (see LICENSE or https://opensource.org/licenses/MIT)
 
 import uuid
@@ -24,7 +24,7 @@ class FileEntry(object):
         self.is_archive = self._flag_set(FileAttributes.FILE_ATTRIBUTE_ARCHIVE)
         self.is_compressed = self._flag_set(FileAttributes.FILE_ATTRIBUTE_COMPRESSED)
         self.is_directory = self._flag_set(FileAttributes.FILE_ATTRIBUTE_DIRECTORY)
-        self.is_hidden = self._flag_set(FileAttributes.FILE_ATTRIBUTE_HIDDEN)
+         
         self.is_normal = self._flag_set(FileAttributes.FILE_ATTRIBUTE_NORMAL)
         self.is_readonly = self._flag_set(FileAttributes.FILE_ATTRIBUTE_READONLY)
         self.is_reparse_point = self._flag_set(FileAttributes.FILE_ATTRIBUTE_REPARSE_POINT)
@@ -47,7 +47,7 @@ def _listdir(tree, path, pattern, recurse):
     # This is done in a compound request so we send 1 packet instead of 3 at the expense of more complex code.
     directory = Open(tree, path)
     query = [
-        directory.create(
+            directory.create(
             ImpersonationLevel.Impersonation,
             DirectoryAccessMask.FILE_LIST_DIRECTORY,
             FileAttributes.FILE_ATTRIBUTE_DIRECTORY,
