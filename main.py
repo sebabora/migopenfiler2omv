@@ -2,10 +2,8 @@
 import os
 import sys
 import cli
-# import migrateusers
-# import migratedata
-# import migrateshares
-# import migopenfiler2omv
+
+import logging
 
 def list_files(startpath):
     if not startpath:
