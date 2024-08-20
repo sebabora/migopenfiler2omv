@@ -1,17 +1,21 @@
 import xml.etree.ElementTree as xp 
+jjjj
 
 def parseShare(filename = "Roboczy_IT.info.xml"):
    tree = xp.parse("/srv/olddata/" + filename)
    root = tree.getroot()
    for child in root:
-        if child.tag != "group" or child.tag != "network":
+        # if child.tag != "group" or child.tag != "network":
+        if child.tag == "group": 
+            for attr in child.attrib:
+                if 
             print(child.tag," =>",  child.attrib)
 def getSharesList(openfilerDataPath = "/srv/olddata"):
     print("retriving list of files to prase")
     print("------------- --------------------")
     print("------------- --------------------")
     print("------------- --------------------")
-   
+ 
 parseShare()
 getSharesList()
 
