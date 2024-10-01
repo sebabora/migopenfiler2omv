@@ -1,27 +1,34 @@
 import click
 import users
 from omvapi import *
+import logging
+import sys
 
 @click.group()
 @click.option('--debug/--no-debug', default=True)
 @click.option('--usage', is_flag=True, help='Print commont usage of tool')
 @click.version_option(version='0.0.1')
 @click.help_option()
-def cli(debug, usage):
+@click.pass_context
+def cli(ctx, debug, usage):
     click.echo('Debug mode is %s' % ('ON' if debug else 'off'))
+    ctx.ensure_object(dict)
     if usage:
         click.echo('Print standard usage of the application')
-    pass
+    ctx.obj['DEBUG'] = debug
+    ctx.obj['USAGE'] = usage
 
 @cli.command()
 @click.option('--help/-h')
-def help(help):
+@click.pass_context
+def help(ctx, help):
     click.echo("This script should help you migrate old openmediavault to new system OpenMediaVault")
     pass
 
 @cli.command()
 @click.argument('synctype', type=click.Choice(['users', 'shares', 'data'], case_sensitive=False), default="data")
-def sync(synctype):
+@click.pass_context
+def sync(ctx, synctype):
     if synctype == 'users':
         click.echo("SYNC users")
     if synctype == 'shares':
@@ -36,7 +43,8 @@ def sync(synctype):
 @click.option('--users-black-list', '-ubl', 'usersBlackList', type=click.Path(), help='list of user excluded from migration')
 @click.option('--users-output-file', '-uo', 'usersOutputFile', type=click.Path(), help='Parsed user output file')
 @click.option('--dry-run-users', '-dru', 'dryRunUsers', is_flag=True, help='prints just the users info from ldif file')
-def migrate(ldifPath,
+@click.pass_context
+def migrate(ctx, ldifPath,
             usersOutputFile,
             usersWhiteList,
             usersBlackList,
@@ -56,23 +64,53 @@ def migrate(ldifPath,
                                    'systemusers', 
                                    'groups', 
                                    'systemgroups', 
+                                   'sharedfolders',
                                    'shares', 
                                    'disks'], 
                                   case_sensitive=False), 
                 default="users")
-def show(omvobj):
+@click.option('--print-uuid', '-pu', is_flag=True, help='print only uuids and names in debug mode')
+@click.option('--asc/--desc', default=True)
+@click.pass_context
+def show(ctx, omvobj, print_uuid, asc):
+    
     if omvobj == "users":
-        getOmvUsers()
+        getOmvUsers(ctx)
     if omvobj == "systemusers":
-        getOmvSystemUsers()
+        getOmvSystemUsers(ctx)
     if omvobj == "groups":
-        getOmvGroups(True, False)
+        getOmvGroups(ctx, False)
     if omvobj == "systemgroups":
-        getOmvGroups(True, True)
+        getOmvGroups(ctx, True)
+    if omvobj == "sharedfolders":
+        getSharedFolders(ctx, print_uuid)
     if omvobj == "shares":
-        getSharedFolders()
+        getShares(ctx, print_uuid)
     if omvobj == "disks":
-        getListOfFilesystems()
+        getListOfFilesystems(ctx)
+    # print('type: ', type(ctx))
+
+@cli.command(name="test")
+@click.pass_context
+def tests(ctx):
+    logHandler = logging.StreamHandler(sys.stdout)
+    log = logging.getLogger("my-loger")
+    log.addHandler(logHandler)
+    log.error("hello world")
+    log.info("hello world info")
+
+    test_user = {"name" :"rpcUsr",
+                 "groups" : ["rpcUsrGr","users"],
+                 "password" : "dupamaryski",
+                 "email" : "", 
+                 "disallowusermod" : False, 
+                 "sshpubkeys" : []}
+    createOmvUser(test_user, True)
+    test_group = {"name" : "rpcGroup",
+                  "gid" : "1045",
+                  "members" : ["rpcUsr"]}
+    createOmvGroup(test_group, True)
+    pass
 
 # TODO: odczytaj listę użytkowników
 # TODO: konwertuj listę użytkowników

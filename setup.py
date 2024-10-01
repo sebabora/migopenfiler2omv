@@ -6,9 +6,12 @@ setup(
         py_modules=['cli']
         install_requires=[
             'Click',
+            'ldif',
+            'rich',
         ],
         entry_points={
             'console_scripts': [
-            'cli = cli:cli',
+            'migrationscript = migrationscript:cli',
         ],
+)
                 
