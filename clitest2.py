@@ -86,6 +86,10 @@ def migrate(ctx):
 @click.pass_context
 def migrateUsers(ctx, ldifPath, whiteList, blackList, outputFile):
     click.echo("Using file:", click.format_filename(ldifPath))
+    users.parseLDIFile(ldifPath)
+    # TODO: 
+    # - parse users,
+    # - parse groups,
     
     pass
 
@@ -99,6 +103,9 @@ def migrateUsers(ctx, ldifPath, whiteList, blackList, outputFile):
 def migrateGroups(ctx, ldifPath, whiteList, blackList, outputFile):
     click.echo("Using file:", click.format_filename(ldifPath))
     click.echo("migrating group")
+    # TODO: 
+    # - parse users,
+    # - parse groups,
     pass
 
 @migrate.command(name='sharedfolders')
@@ -108,6 +115,11 @@ def migrateGroups(ctx, ldifPath, whiteList, blackList, outputFile):
 @click.pass_context
 def migrateSharedFolders(ctx, sourceDir, blackList):
     click.echo("migrating sharedfolders")
+    # TODO: 
+    # - parse users,
+    # - parse groups,
+    # - create temporary files for users and groups,
+    # - 
     pass
 
 @migrate.command(name='shares')
