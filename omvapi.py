@@ -10,6 +10,11 @@ from rich import print_json
 # from click import Context
 import click
 
+def errorPrinter(response : dict):
+    err = response["error"]
+    print("Error code:", err["code"])
+    print("Error message:", err["message"])
+
 # NOTE: zrobione
 def omvRpcCmd(cmd = "-h"):
     omvCmdPath = '/usr/sbin/omv-rpc'
@@ -163,7 +168,7 @@ def getOmvGroups(ctx, systemGroups = False) -> list:
             print("EMPTY LIST")
     except ValueError:
         print('Decoding JSON has failed')
-
+# TODO: debug and table fix based on needed data for rpc api
 def printSharedFolders(omvSharedFoldersList : list, print_uuid=False):
     print("Found %s openmediavault shares" % len(omvSharedFoldersList))
     tab = Table(title="OpenMediaVault shares")
@@ -194,19 +199,36 @@ def printSharedFolders(omvSharedFoldersList : list, print_uuid=False):
         tab2.add_column("uuid", justify="left", style="green")
         
         for share in omvSharedFoldersList:
+            # getSharedFolderPermissions(share)
             tab2.add_row(str(int(share['_used'])),
                         share['name'],
                         share['device'], 
                         share['uuid'],
                         )
-            # getSharedFolderPermissions(share)
         console.print(tab2)
+        
+def getSharedFolderPermissions(sharedFolder : dict, debug = True) -> bool:
+    # request_test = {'uuid' : "df8e639f-0706-47c8-bd8f-f10a3dd65b0a"}
+    request_test = {'uuid' : ""}
+    request = request_test
+    # request = {"uuid" : sharedFolder["uuid"]}
 
-def getSharedFolderPermissions(share : dict, debug = True) -> bool:
-    # out = omvRpcCmd("'ShareMgmt' 'getPrivileges' '".join(share['uuid']
-    # out = omvRpcCmd("'ShareMgmt' 'getPrivileges' '{0}'".format(share['uuid']))
-    # print("'ShareMgmt' 'getPrivileges' '"{0}:{1}\"}\'".format("name", share['uuid']))
-    # print("'ShareMgmt' 'getPrivileges' '"{0}:{1}\"}\'".format("name", share['uuid']))
+    request_json = json.dumps(request, ensure_ascii=True, separators=(', ', ':'))
+    cmd_request = f"'ShareMgmt' 'getPrivileges' '{request_json}'"
+
+    response_raw = omvRpcCmd(cmd_request)
+    try:
+        response = json.loads(response_raw)
+        print(response)
+        print("TYPE: ", response["response"])
+        if response["response"] == "null":
+            errorPrinter(response)
+            return False
+    except ValueError:
+        print('Decoding JSON has failed')
+    return True
+def setSharedFolderPermissions(uuid : str, privileges : list):
+    #[{'type': 'user', 'name': 'linusrtest', 'perms': None}, {'type': 'user', 'name': 'rpcUsr', 'perms': None}, {'type": 'group', 'name': 'rpcUsrGr', 'perms': None}]
     pass
 
 def getSharedFolders(ctx, print_uuid = False) -> list:
@@ -225,6 +247,49 @@ def getSharedFolders(ctx, print_uuid = False) -> list:
     except ValueError:
         print('Decoding JSON has failed')
 # -------------------------------------------------------------------------
+def createSharedFolder(sharedFolder : dict) -> bool:
+    request = {"name" : sharedFolder["name"]}
+
+    request_json = json.dumps(request, ensure_ascii=True, separators=(', ', ':'))
+    cmd_request = f"'ShareMgmt' 'set''{request_json}'"
+
+    response_raw = omvRpcCmd(cmd_request)
+    try:
+        response = json.loads(response_raw)
+        if response["response"] == "null":
+            errorPrinter(response)
+            return True
+        else:
+            print("Deletedl group:", sharedFolder["name"])
+            return False
+    except ValueError:
+        print('Decoding JSON has failed')
+
+    pass
+
+def deleteSharedFolder(sharedFolder : dict, debug = True) -> bool:
+    request = {"name" : user["name"]}
+
+    request_json = json.dumps(request, ensure_ascii=True, separators=(', ', ':'))
+    cmd_request = f"'UserMgmt' 'deleteUser' '{request_json}'"
+
+    response_raw = omvRpcCmd(cmd_request)
+    try:
+        response = json.loads(response_raw)
+        if response["response"] == "null":
+            errorPrinter(response)
+            return True
+        else:
+            print("Deletedl group:", user["name"])
+            return False
+    except ValueError:
+        print('Decoding JSON has failed')
+
+def deleteSharedFolders(sharedFoldersList : list, ctx) -> bool:
+    for sharedFolder in sharedFoldersList:
+        deleteSharedFolder(sharedFolder)
+    pass
+# NOTE: done
 def printShares(omvShareList : list, print_uuid=False):
     print("Found %s openmediavault shares" % len(omvShareList))
     tab = Table(title="OpenMediaVault shares")
@@ -264,6 +329,8 @@ def printShares(omvShareList : list, print_uuid=False):
         console.print(tab2)
 
 def getSharesPermissions(share : dict, debug = True) -> bool:
+    # NOTE: check if exist
+    # make support for erros and printing it
     # out = omvRpcCmd("'ShareMgmt' 'getPrivileges' '".join(share['uuid']
     # out = omvRpcCmd("'ShareMgmt' 'getPrivileges' '{0}'".format(share['uuid']))
     # print("'ShareMgmt' 'getPrivileges' '"{0}:{1}\"}\'".format("name", share['uuid']))
@@ -314,10 +381,12 @@ def getShares(ctx, print_uuid = False) -> list:
     if type(response_raw) == type(None):
         print("NONNNEEE TYPE")
         return []
-def errorPrinter(response : dict):
-    err = response["error"]
-    print("Error code:", err["code"])
-    print("Error message:", err["message"])
+def createShare(share : dict, debug = True) -> bool:
+    return True
+def deleteShare(share : dict, debug = True) -> bool:
+    return True
+def deleteShares(shareList : list, debug = True) -> bool:
+    return True
 
 def createOmvUser(user : dict, debug = True):
     # request = {"start" : start, "limit" : limit, "sortfiled" : "name", "stordir" : "ASC" }
@@ -333,6 +402,7 @@ def createOmvUser(user : dict, debug = True):
     response_raw = omvRpcCmd(cmd_request)
     try:
         response = json.loads(response_raw)
+        # FIX: use errorPrinter
         if response["response"] == "null":
             err = response["error"]
             print("Error code:", err["code"])
@@ -341,8 +411,6 @@ def createOmvUser(user : dict, debug = True):
             print("created a user")
     except ValueError:
         print('Decoding JSON has failed')
-
-    # if debug: print(user)
     # omvRpcCmd('UserMgmt ' + json.dumps(user, sort_keys=False, default=str))
 
 def createOmvUsers(listOfUsers : list, debug = True):
@@ -363,8 +431,8 @@ def createOmvGroup(group : dict, debug = True):
 def createOmvGroups(listOfGroups : list, debug = True):
     for group in listOfGroups:
         createOmvGroup(group, debug)
-
-def deleteUser(user : dict) -> bool:
+# NOTE: done
+def deleteUser(user : dict, debug = True) -> bool:
     request = {"name" : user["name"]}
 
     request_json = json.dumps(request, ensure_ascii=True, separators=(', ', ':'))
@@ -382,7 +450,7 @@ def deleteUser(user : dict) -> bool:
     except ValueError:
         print('Decoding JSON has failed')
 
-def deleteGroup(group: dict) -> bool:
+def deleteGroup(group: dict, debug = True) -> bool:
     request = {"name" : group["name"]}
 
     request_json = json.dumps(request, ensure_ascii=True, separators=(', ', ':'))
