@@ -1,56 +1,155 @@
 import os
 import xml.etree.ElementTree as xp 
+import glob
+from pathlib import Path
+import omvapi
+from rich.console import Console
+from rich.table import Table
+# from omvapi import
 
-def parseShare(filename = "Roboczy_IT.info.xml"):
-   tree = xp.parse("/srv/olddata/" + filename)
-   root = tree.getroot()
-   for child in root:
-        # if child.tag != "group" or child.tag != "network":
-        # if child.tag == "group": 
-        #     for attr in child.attrib:
-        #         print(child.tag,"=>",  child.attrib)
-        #         print(type(child.tag),"=>",  type(child.attrib))
-        if child.tag == "group" or child.tag == "network":
-            continue
-        else:
-            print(child.tag, "->" , child.attrib)
+sharedFolderList = []
 
+def printOfShares(smbShareList : list):
+    tab = Table(title="Openfilershares")
+    tab.add_column("Name", justify="right", style="green", no_wrap=True)
+    tab.add_column("EN", justify="center", style="blue")
+    tab.add_column("Guest", justify="center")
+    tab.add_column("Browseable", justify="center", style="white")
+    tab.add_column("bin", justify="center", style="white")
+    tab.add_column("timemachine", justify="center", style="white")
+    tab.add_column("encryption", justify="center", style="white")
 
-def getSharesList(openfilerDataPath = "/srv/olddata"):
-    parseShare()
+    print("Total number of shares %s" % len(smbShareList))
 
-def list_files(startpath):
-    if not startpath:
-        startpath = "/home/sebastian/"
-    else:
-        print("Start path ", startpath)
+    for smbShare in smbShareList:
+        tab.add_row(smbShare["name"],
+                    "Y" if smbShare["enable"] else "N",
+                    smbShare["guest"],
+                    "Y" if smbShare["browseable"] else "N",
+                    "Y" if smbShare["recyclebin"] else "N",
+                    "Y" if smbShare["timemachine"] else "N",
+                    "Y" if smbShare["transportencryption"] else "N")
+                    # smbShare["extraoptions"],
+                
+    console = Console()
+    console.print(tab)
+    
+def parseOfShares(xmlfilePath : str) -> dict:
+    # TODO: usuń to bo to tymczasowe tylko
+    # 
+    xmltree = xp.parse(xmlfilePath)
+    sharedesc = ""
+    sharePublicAccess = "no"
+    smbShare = {}
 
-    for root, dirs, files in os.walk(startpath):
-        level = root.replace(startpath, '').count(os.sep)
-        indent = ' ' * 4 * (level)
-        print('{}{}/'.format(indent, os.path.basename(root)))
-        subindent = ' ' * 4 * (level + 1)
-        for f in files:
-            print('{}{}'.format(subindent, f))
-def list_xml_directory_files(path2openfilersys = "/srv/olddata/"):
-    for root, dirs, files in os.walk(path2openfilersys):
-        if layer == 1:
-            print(files)
+    smbShare["name"] = ""
+    xmlroot = xmltree.getroot()
 
-if __name__ == "__shares.py":
-    print("Exp")
- 
-# parseShare()
-getSharesList()
+    for child in xmlroot:
 
-   # tree = xp.parse("/srv/olddata/" + filename)
-   # root = tree.getroot()
-   # for child in root:
-   #      # if child.tag != "group" or child.tag != "network":
-   #      if child.tag == "group": 
-   #          for attr in child.attrib:
-   #              print(child.tag,"=>",  child.attrib)
-   #              print(type(child.tag),"=>",  type(child.attrib))
+        groupAccessList = []
+        groupReadList = []
+        groupWriteList = []
+
+        if child.tag == "dircount":
+            dircountname = child.attrib.get("name", None)
+            if not dircountname:
+                print("dircount not 0")
+        if child.tag == "dirtype":
+            dirtypename = child.attrib.get("name", None)
+            if dirtypename == "share":
+                print("dirtype not share")
+        if child.tag == "description":
+            sharedesc = child.attrib.get("value", None)
+            if not sharedesc:
+                smbShare["comment"] = sharedesc
+
+        # print("tagg:", child.tag,"attrib: ", child.attrib)
+        if child.tag == "smb":
+            # print(child.attrib["sharename"])
+            # NOTE: this is how you get value of sharename if it doesn't exists
+            sharename = child.attrib.get("sharename", None)
+            if "sharename" in child.attrib:
+                smbShare["name"] = sharename
+            else:
+                print("NOTE EXISTS, in a file:", xmlfilePath)
+                smbShare["name"] = ""
+                continue
+            if sharename != None:
+                smbShare["name"] = child.attrib["sharename"]
+                # print(child.attrib["sharename"])
+                # smbname = child.attrib["sharename"].replace(" ", "_")
+            else:
+                print("sharename NONNNEE")
+
+        if len(smbShare) > 0:
+            if child.tag == "network":
+                pass
+                # print(child.attrib.get("network"))
+            if child.tag == "access":
+                sharePublicAccess = child.attrib.get("public")
+
+            smbShare["enable"] = True
+            smbShare["sharedfolderref"] = "4cf9e35a-868e-4390-b627-187409020867"
+            smbShare["comment"] = ""
+            smbShare["guest"] = "no"
+            smbShare["readonly"] = False
+            smbShare["browseable"] = child.attrib.get("browseable")
+            smbShare["recyclebin"] = True
+            smbShare["recyclemaxsize"] = 0
+            smbShare["recyclemaxage"] = 30
+            smbShare["hidedotfiles"] = True
+            smbShare["inheritacls"] = False
+            smbShare["inheritpermissions"] = False
+            smbShare["easupport"] = False
+            smbShare["storedosattributes"] = False
+            smbShare["hostsallow"] = ""
+            smbShare["hostsdeny"] = ""
+            smbShare["audit"] = False
+            smbShare["timemachine"] = False
+            smbShare["transportencryption"] = False
+            smbShare["extraoptions"] = ""
+
+        if child.tag == "group":
+            if child.attrib.get("read") == "yes":
+                groupReadList.append(child.attrib.get("id"))
+            if child.attrib.get("write") == "yes":
+                groupWriteList.append(child.attrib.get("id"))
+            if child.attrib.get("access") == "yes":
+                groupAccessList.append(child.attrib.get("id"))
+
+        if child.tag == "primary":
+            primaryGroupId = child.attrib.get("id")
+            groupAccessList.append(primaryGroupId)
+            groupReadList.append(primaryGroupId)
+            groupWriteList.append(primaryGroupId)
+            # TODO: this can be deleted
+            smbShare["primaryGroup"] = primaryGroupId
+
+        smbShare["accesslist"] = groupAccessList
+        smbShare["writelist"] = groupWriteList
+        smbShare["readlist"] = groupReadList
+
+    return smbShare
+
+def getOfSharesList(xmlfilelist : list) -> list:
+    
+    for xmlfile in xmlfilelist:
+        tsmbShare = parseOfShares(xmlfile)
+        sharedFolderList.append(tsmbShare)
+    printOfShares(sharedFolderList)
+
+# NOTE: invoke first
+def createOfSharesFromFiles(directory : Path) -> list:
+    xmlfiles = []
+    for file in glob.glob(str(directory.joinpath("*.xml"))):
+        xmlfiles.append(file)
+    # for path in xmlfiles:
+    #     print(path)
+    return xmlfiles 
+
+getOfSharesList(createOfSharesFromFiles(Path('/srv/olddata/')))
+
 """
 === sharemgmt ===
 "getCandidates"
