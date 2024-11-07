@@ -5,34 +5,70 @@ from pathlib import Path
 import omvapi
 from rich.console import Console
 from rich.table import Table
+from rich.columns import Columns
+from rich import print
 # from omvapi import
 
 sharedFolderList = []
 
-def printOfShares(smbShareList : list):
-    tab = Table(title="Openfilershares")
-    tab.add_column("Name", justify="right", style="green", no_wrap=True)
-    tab.add_column("EN", justify="center", style="blue")
-    tab.add_column("Guest", justify="center")
-    tab.add_column("Browseable", justify="center", style="white")
-    tab.add_column("bin", justify="center", style="white")
-    tab.add_column("timemachine", justify="center", style="white")
-    tab.add_column("encryption", justify="center", style="white")
+def printOfShares(smbShareList : list, textOnly = True):
 
-    print("Total number of shares %s" % len(smbShareList))
+    if textOnly:
+        name = "Name"
+        maxNameLenght = 31
+        # columnsHeaderNames = [name, "Enable", "Guest", "Browseable", "RecycleBin", "TM",
+        columnsHeaderNames = [name.ljust(maxNameLenght, " "), "Enable", "Guest", "Browseable", "RecycleBin", "TM", "Enc"]
+        maxColSize = 0
+        for col in columnsHeaderNames:
+            if len(col) > maxColSize:
+                maxColSize = len(col)
+            
+        columnHeader = Columns(columnsHeaderNames, padding=(2,5), equal=False, expand=True)
+        print(columnHeader)
 
-    for smbShare in smbShareList:
-        tab.add_row(smbShare["name"],
-                    "Y" if smbShare["enable"] else "N",
-                    smbShare["guest"],
-                    "Y" if smbShare["browseable"] else "N",
-                    "Y" if smbShare["recyclebin"] else "N",
-                    "Y" if smbShare["timemachine"] else "N",
-                    "Y" if smbShare["transportencryption"] else "N")
-                    # smbShare["extraoptions"],
-                
-    console = Console()
-    console.print(tab)
+        for smbShare in smbShareList:
+            name = ""
+            if len(smbShare["name"]) > maxNameLenght:
+                name = smbShare["name"][:maxNameLenght]
+            else:
+                name = smbShare["name"]
+
+            row = [name.ljust(maxNameLenght),
+                   smbShare["guest"],
+                   "Y" if smbShare["enable"] else "N",
+                   "Y" if smbShare["browseable"] else "N",
+                   "Y" if smbShare["recyclebin"] else "N",
+                   "Y" if smbShare["timemachine"] else "N",
+                   "Y" if smbShare["transportencryption"] else "N"]
+            column = Columns(row, align="left" ,equal=False, expand=True)
+            print(column)
+    else:
+        tab = Table(title="Openfilershares")
+        tab.add_column("Name", justify="right", style="green", no_wrap=True)
+        tab.add_column("EN", justify="center", style="blue")
+        tab.add_column("Guest", justify="center")
+        tab.add_column("Browseable", justify="center", style="white")
+        tab.add_column("bin", justify="center", style="white")
+        tab.add_column("timemachine", justify="center", style="white")
+        tab.add_column("encryption", justify="center", style="white")
+
+        print("Total number of shares %s" % len(smbShareList))
+
+        for smbShare in smbShareList:
+            tab.add_row(smbShare["name"],
+                        "Y" if smbShare["enable"] else "N",
+                        smbShare["guest"],
+                        "Y" if smbShare["browseable"] else "N",
+                        "Y" if smbShare["recyclebin"] else "N",
+                        "Y" if smbShare["timemachine"] else "N",
+                        "Y" if smbShare["transportencryption"] else "N")
+                        # smbShare["extraoptions"],
+                    
+        console = Console()
+        console.print(tab)
+
+        print("Total number of shares %s" % len(smbShareList))
+    print("max col size", maxColSize)
     
 def parseOfShares(xmlfilePath : str) -> dict:
     # TODO: usuń to bo to tymczasowe tylko
@@ -42,6 +78,7 @@ def parseOfShares(xmlfilePath : str) -> dict:
     sharePublicAccess = "no"
     smbShare = {}
 
+    # HACK: ensures that there is allways "name"
     smbShare["name"] = ""
     xmlroot = xmltree.getroot()
 
@@ -91,7 +128,8 @@ def parseOfShares(xmlfilePath : str) -> dict:
 
             smbShare["enable"] = True
             smbShare["sharedfolderref"] = "4cf9e35a-868e-4390-b627-187409020867"
-            smbShare["comment"] = ""
+            # NOTE: allready set highier
+            # smbShare["comment"] = ""
             smbShare["guest"] = "no"
             smbShare["readonly"] = False
             smbShare["browseable"] = child.attrib.get("browseable")
@@ -147,6 +185,34 @@ def createOfSharesFromFiles(directory : Path) -> list:
     # for path in xmlfiles:
     #     print(path)
     return xmlfiles 
+
+def exportOfShares(ofShareList : list, path = "/tmp/sharemigrationtmp.json"):
+    fnames = []
+    if len(ofShareList) > 0:
+        first = ofShareList[0]
+        fnames = first.keys()
+    else:
+        log.error("Empty Group list")
+    ## TODO: exit program with error
+
+    with open(path, "w", newline='') as csvfile:
+        # dwriter = csvfile.writer(csvfile)
+
+        dwriter = csv.DictWriter(csvfile, 
+                                 fieldnames=fnames,
+                                 delimiter=";",
+                                 quoting=csv.QUOTE_MINIMAL,
+                                 dialect="excel")
+        dwriter.writeheader()
+        row = {}
+        for u in ofShareList:
+            for key, val in u.items():
+                if type(val) is list:
+                    row[key] = ",".join(val)
+                else:
+                    row[key] = val
+
+            dwriter.writerow(row)
 
 getOfSharesList(createOfSharesFromFiles(Path('/srv/olddata/')))
 
