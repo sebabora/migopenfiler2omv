@@ -5,6 +5,7 @@ import logging
 from rich.console import Console
 from rich.table import Table
 from rich.table import box
+from richlogging import logger as rlog 
 # from rich.jason import JSON
 from rich import print_json
 # from click import Context
@@ -227,6 +228,7 @@ def getSharedFolderPermissions(sharedFolder : dict, debug = True) -> bool:
     except ValueError:
         print('Decoding JSON has failed')
     return True
+
 def setSharedFolderPermissions(uuid : str, privileges : list):
     #[{'type': 'user', 'name': 'linusrtest', 'perms': None}, {'type': 'user', 'name': 'rpcUsr', 'perms': None}, {'type": 'group', 'name': 'rpcUsrGr', 'perms': None}]
     pass
@@ -247,11 +249,14 @@ def getSharedFolders(ctx, print_uuid = False) -> list:
     except ValueError:
         print('Decoding JSON has failed')
 # -------------------------------------------------------------------------
-def createSharedFolder(sharedFolder : dict) -> bool:
+def createSharedFolder(sharedFolder : dict, debug = True) -> bool:
     request = {"name" : sharedFolder["name"]}
 
     request_json = json.dumps(request, ensure_ascii=True, separators=(', ', ':'))
     cmd_request = f"'ShareMgmt' 'set''{request_json}'"
+    
+    if debug:
+        rlog.debug("Request: ".join(cmd_request))
 
     response_raw = omvRpcCmd(cmd_request)
     try:
@@ -265,13 +270,15 @@ def createSharedFolder(sharedFolder : dict) -> bool:
     except ValueError:
         print('Decoding JSON has failed')
 
-    pass
-
 def deleteSharedFolder(sharedFolder : dict, debug = True) -> bool:
-    request = {"name" : user["name"]}
+    # NOTE: using uuid !?
+    request = {"name" : sharedFolder["name"]}
 
     request_json = json.dumps(request, ensure_ascii=True, separators=(', ', ':'))
-    cmd_request = f"'UserMgmt' 'deleteUser' '{request_json}'"
+    cmd_request = f"'ShareMgmt' 'delete' '{request_json}'"
+
+    if debug:
+        rlog.debug("Request: ".join(cmd_request))
 
     response_raw = omvRpcCmd(cmd_request)
     try:
@@ -280,7 +287,7 @@ def deleteSharedFolder(sharedFolder : dict, debug = True) -> bool:
             errorPrinter(response)
             return True
         else:
-            print("Deletedl group:", user["name"])
+            print("Deletedl group:", sharedFolder["name"])
             return False
     except ValueError:
         print('Decoding JSON has failed')
@@ -288,7 +295,6 @@ def deleteSharedFolder(sharedFolder : dict, debug = True) -> bool:
 def deleteSharedFolders(sharedFoldersList : list, ctx) -> bool:
     for sharedFolder in sharedFoldersList:
         deleteSharedFolder(sharedFolder)
-    pass
 # NOTE: done
 def printShares(omvShareList : list, print_uuid=False):
     print("Found %s openmediavault shares" % len(omvShareList))
@@ -432,7 +438,7 @@ def createOmvGroups(listOfGroups : list, debug = True):
     for group in listOfGroups:
         createOmvGroup(group, debug)
 # NOTE: done
-def deleteUser(user : dict, debug = True) -> bool:
+def deleteOmvUser(user : dict, debug = True) -> bool:
     request = {"name" : user["name"]}
 
     request_json = json.dumps(request, ensure_ascii=True, separators=(', ', ':'))
@@ -450,7 +456,7 @@ def deleteUser(user : dict, debug = True) -> bool:
     except ValueError:
         print('Decoding JSON has failed')
 
-def deleteGroup(group: dict, debug = True) -> bool:
+def deleteOmvGroup(group: dict, debug = True) -> bool:
     request = {"name" : group["name"]}
 
     request_json = json.dumps(request, ensure_ascii=True, separators=(', ', ':'))
@@ -474,7 +480,9 @@ def deleteAllOmvUsers(omvUsersList: dict, exception : str) -> bool:
         if user["name"] == exception:
             continue
         else:
-            result = result or deleteUser(user)
+            result = result or deleteOmvUser(user)
+            rlog.info(f'Deleting user: {user["name"]}')
+
     return result
             
 def deleteAllOmvGroups(group : dict, exception : str) -> bool:
@@ -483,6 +491,7 @@ def deleteAllOmvGroups(group : dict, exception : str) -> bool:
         if group["name"] == exception:
             continue
         else:
-            result = result or deleteGroup(group)
+            result = result or deleteOmvGroup(group)
+            rlog.info(f'Deleting group: {group["name"]}')
     return result
 

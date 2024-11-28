@@ -2,40 +2,65 @@ import shutil
 # import subprocess
 import subprocess
 import rich.progress
+import os
+from pathlib import Path
+from richlogging import logger as rlog 
 
-def copydata(src, dst) -> int:
-    try:
-        output = run("exit 1", shell=True, check=True, capture_output=True)
-    except subprocess.CalledProcessError as e:
-        print(e.returncode)
-        print("dupad")
-        print(e.output)
-    print("copy data")
-    print(output)
+def copyShareData(src : Path, dst : Path, dry_run = True):
+    
+    # rlog = rich.liogging.getLogger(__name__)
+    # richlogging.logger.info('testlog')
+    
+    rlog.info(f'Copying data from {str(src)} to {str(dst)}' )
 
-def list_files(startpath):
-    if not startpath:
-        startpath = "/home/sebastian/"
+    rsyncPath = "/usr/bin/rsync"
+    if dry_run:
+        rsyncOptions =  "-avz --no-perms --no-owner --no-group --delete --dry-run"
     else:
-        print("Start path ", startpath)
+        rsyncOptions =  "-avz --no-perms --no-owner --no-group --delete"
 
-    for root, dirs, files in os.walk(startpath):
-        level = root.replace(startpath, '').count(os.sep)
-        indent = ' ' * 4 * (level)
-        print('{}{}/'.format(indent, os.path.basename(root)))
-        subindent = ' ' * 4 * (level + 1)
-        for f in files:
-            print('{}{}'.format(subindent, f))
-def list_xml_directory_files(path2openfilersys):
-    for root, dirs, files in os.walk(path2openfilersys):
-        if layer == 1:
-            print(files)
-def main():
-    testpath = "/home/sborawski/"
-    if not testpath:
-        print("Please give path to copy of openfiler system")
-        exit(1)
-    glob.glob(testpath + "*.xml")
-    printusers("jkada")
+    rlog.debug(f'Rsync options used: {rsyncOptions}')
+        
+    # jesli src konczy sie do 
+    if src.exists() and src.is_dir():
+        rlog.debug(f'Source directory {str(src)} exists')
+    else:
+        rlog.error(f'Source directory {str(src)} does not exists')
+        os._exit(os.EX_IOERR)
 
-copydata("/tmp/1", "/tmp/2")
+
+    if dst.exists() and dst.is_dir():
+        print("Using destination path:", str(src))
+        rlog.debug(f'Destination directory {str(dst)} exists')
+    else:
+        rlog.error(f'Destination directory {str(dst)} does not exists')
+        os._exit(os.EX_IOERR)
+
+    srcPathStr = str(src)
+    dstPathStr = str(dst)
+
+    if not str(srcPathStr).endswith("/"):
+        srcPathStr = srcPathStr + "/"
+
+    if not str(dstPathStr).endswith("/"):
+        dstPathStr = dstPathStr + "/"
+
+    if os.getuid() != 0:
+        rlog.critical(f'Elevate privileges !')
+        # exit("You need to have root privileges to run rsync script")
+    else:
+        try:
+            proc = subprocess.check_output("{0} {1} {2} {3}".format(rsyncPath,
+                                                                    rsyncOptions, 
+                                                                    srcPathStr,
+                                                                    dstPathStr),
+                                                                    stderr=subprocess.STDOUT, 
+                                                                    shell=True)
+            return proc
+        except subprocess.CalledProcessError as e:
+            rlog.error(f'running rsync {e}')
+            proc = e.output.decode()
+            return proc
+
+if __name__ == "__main__":
+        copyShareData(Path("/tmp/1"), Path("/tmp/2"))

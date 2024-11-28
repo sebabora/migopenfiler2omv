@@ -9,7 +9,8 @@ import csv
 import os
 import errno
 import sys
-import logging as log
+# import logging as log
+from richlogging import logger as rlog 
 
 testFilePath = "testfiles/"
 testOutputFilePath = testFilePath + "output/"
@@ -19,7 +20,7 @@ defaultPassword = "P5WhBV9j8Q8"
 # KISS
 #
 
-log.basicConfig(filename="testfiles/output/output.log", level=log.DEBUG)
+# log.basicConfig(filename="testfiles/output/output.log", level=log.DEBUG)
 
 ofUsersList : list = []
 ofGroupsList : list = []
@@ -27,19 +28,19 @@ ofGroupsList : list = []
 whiteListedUsers : list = []
 blacklistedUsers : list = []
 
-
-def omvRpcCmd(cmd = "-h"):
-    omvCmdPath = '/usr/sbin/omv-rpc'
-    if os.getuid() != 0:
-        exit("You need to have root privileges to run omv-rpc script")
-    else:
-        try:
-            proc = subprocess.check_output(omvCmdPath + " " + cmd, stderr=subprocess.STDOUT, shell=True)
-            return proc
-        except subprocess.CalledProcessError as e:
-            print("[ERROR]: Error running omv-rpc")
-            proc = e.output.decode()
-            print(proc)
+#.
+# def omvRpcCmd(cmd = "-h"):
+#     omvCmdPath = '/usr/sbin/omv-rpc'
+#     if os.getuid() != 0:
+#         exit("You need to have root privileges to run omv-rpc script")
+#     else:
+#         try:
+#             proc = subprocess.check_output(omvCmdPath + " " + cmd, stderr=subprocess.STDOUT, shell=True)
+#             return proc
+#         except subprocess.CalledProcessError as e:
+#             print("[ERROR]: Error running omv-rpc")
+#             proc = e.output.decode()
+#             print(proc)
 
             
 def parseSamAccount(entry):
@@ -61,7 +62,7 @@ def parseSamAccount(entry):
     omvUser["sshpubkeys"] = [""]
     ## TODO: somekind verbose printing
     #
-    log.debug("Parsing user: %s", omvUser)
+    rlog.debug("Parsing user: %s", omvUser)
     return omvUser
 
 def parseGroup(entry):
@@ -75,7 +76,7 @@ def parseGroup(entry):
 
     ## TODO: somekind verbose printing
     #
-    log.debug("Parsing user")
+    rlog.debug("Parsing user")
 
     return omvGroup
 
@@ -109,45 +110,13 @@ def parseLDIFile(path = "testfiles/ofusersdb.ldif"):
         recordCounter += 1
     ## TODO: some kind verbose printing 
 
-    log.info("Found %i records", recordCounter)
-    log.info("\tFound %s users", len(ofUsersList))
-    log.info("\tFound %s gropus", len(ofGroupsList))
+    rlog.info("Found %i records", recordCounter)
+    rlog.info("\tFound %s users", len(ofUsersList))
+    rlog.info("\tFound %s gropus", len(ofGroupsList))
 
     # print("Records: ", recordCounter)
     # print("Parsed Users: ", len(ofUsersList))
     # print("Parsed Groups: ", len(ofGroupsList))
-    
-def createOmvUser():
-    omvCmdCreateUserPrefix = "-u amin 'UserMgmt' 'setUser'"
-    for user in ofUsersList:
-        print("Creating user...")
-        print(omvCmCreateUserPrefix + json.dump(user))
-    
-def createOmvGroup():
-    omvCmdCreateGroupPrefix = "-u admin 'UserMgmt' 'setGroup'"
-    print("creating group")
-def printUsers():
-    print("printing user")
-
-def printOmvUsers():
-    omvCmdPrintAllUsers = "-u admin 'UserMgmt' 'enumerateUsers'"
-    omvRpcCmd(omvCmdPrintAllUsers)
-
-def printOmvGroups():
-    omvCmdPrintAllGroups = "-u admin 'UserMgmt' 'enumerateGroups'"
-    omvRpcCmd(omvCmdPrintAllGroups)
-
-def deleteAllOmvUsers():
-    omvCmdDeleteUserPrefix = "-u admin 'UserMgmt' 'deleteUser'"
-    ## TODO:: json object
-    # for user in Userlist:
-    omvRpcCmd(omvCmdDeleteUserPrefix + "JSON USER")
-
-def deleteAllOmvGroups():
-    omvCmdDeleteGroupPrefix =  "-u admin 'UserMgmt' 'deleteGroup'"
-    ## TODO: json object
-    # for group in Grouplist: 
-    omvRpcCmd(omvCmdDeleteGroupPrefix + "JSON GROUP")
     
 def importBlacklistedGroups(csvFilePath = "testfiles/blacklistedGroups.csv"):
     
@@ -159,7 +128,7 @@ def importBlacklistedGroups(csvFilePath = "testfiles/blacklistedGroups.csv"):
             rowCounter = 1
             for row in csvreader:
                 if rowCounter == 1:
-                    log.info("Ignoring first line of CSV file")
+                    rlog.info("Ignoring first line of CSV file")
                     rowCounter += 1
                 else:
                     tGroup["groupname"] = row[0].lower()
@@ -189,7 +158,7 @@ def importBlacklistedUsers(csvFilePath = "testfiles/blacklisted.csv"):
         rowCounter = 1
         for row in csvreader:
             if rowCounter == 1:
-                log.info("Ignoring first line of CSV file")
+                rlog.info("Ignoring first line of CSV file")
                 rowCounter += 1
             else:
                 tUser["comment"] = row[0]
@@ -210,7 +179,7 @@ def importWhitelistedUsers(csvFilePath = "testfiles/smbuserspwds.csv"):
     
     if os.path.isfile(csvFilePath):
         
-        log.info("Reading users white list")
+        rlog.info("Reading users white list")
 
         with open(csvFilePath, "r", newline='' ) as csvfile:
             csvreader = csv.reader(csvfile, dialect='excel', delimiter=";")
@@ -252,13 +221,16 @@ def importPasswordList(csvFilePath = "testfiles/secrets.csv", nameFieldNum = 2, 
 
 
 def cleanofUsersList(manual = True) -> None:
+
     if len(blacklistedUsers) > 0:
+        rlog.info(f'Blacklist contains {len(blacklistedUsers)} users')
         for user in ofUsersList:
             for buser in blacklistedUsers:
                 if user["name"].lower() == buser["name"].lower():
                     ofUsersList.remove(user)
                     break
     elif len(whiteListedUsers) > 0:
+        rlog.info(f'Whitelist contains {len(blacklistedUsers)} users')
         if manual: print("Removing user manualy")
         for user in ofUsersList:
             delUser = True
@@ -288,7 +260,7 @@ def cleanofUsersList(manual = True) -> None:
                     print("Removing user: ", user["name"].lower())
         # printAllUsers(ofUsersList)        
     else:
-        log.info("No users whitelist or blacklist has been provided")
+        rlog.info("No users whitelist or blacklist has been provided")
         print("noting to remove")
     
 def cleanofGroupsList(manual = False) -> None:
@@ -331,7 +303,7 @@ def cleanofGroupsList(manual = False) -> None:
                     print("Removing group: ", group["groupname"].lower())
         # printAllgroups(ofGroupsList)        
     else:
-        log.info("No users whitelist or blacklist has been provided")
+        rlog.info("No users whitelist or blacklist has been provided")
         print("noting to remove")
 
 def exportUsers(path = testOutputFilePath + "importUsersToOmv.csv"):
@@ -341,7 +313,7 @@ def exportUsers(path = testOutputFilePath + "importUsersToOmv.csv"):
         first = ofUsersList[0]
         fnames = first.keys()
     else:
-        log.error("Empty Group list")
+        rlog.error("Empty Group list")
     ## TODO: exit program with error
 
     with open(path, "w", newline='') as csvfile:
@@ -378,7 +350,7 @@ def exportGroups(path = testOutputFilePath + "importGroupsToOmv.csv"):
         first = ofGroupsList[0]
         fnames = first.keys()
     else:
-        log.error("Empty Group list")
+        rlog.error("Empty Group list")
     ## TODO: exit program with error
 
     with open(path, "w", newline='') as csvfile:
@@ -426,35 +398,11 @@ def printAllGroups(gl: list) -> None:
             print("gid: ", group["gid"], end="")
             print("members: ", group["members"]) 
 
-def serialize2file(listofjsonsobj: list, path = testOutputFilePath + "outputUser.json"):
-    with open(path, "w+") as jsonfile:
-        print("serializing files")
-        for entry in listofjsonsobj:
-            json.dump(entry, jsonfile)
-#tests:
-# parseLDIFile()
-# importWhitelistedUsers()
-# # importBlacklistedUsers()
-#
-# importPasswordList("testfiles/smbuserspwds.csv")
-# cleanofUsersList(False)
-# cleanofGroupsList(False)
-#
-# print("ofUsersList:", len(ofUsersList))
-# print("White listed users:", len(whiteListedUsers))
-# print("ofGroupsList", len(ofGroupsList))
-#
-# exportUsers()
-# exportGroups()
-#
-# serialize2file(ofUsersList)
-# printAllUsers(ofUsersList)
-
-# try:
-#     proc = subprocess.check_output(omvCmdPath + omvCmdPrintAllGroups, stderr=subprocess.STDOUT, shell=True)
-# except IOError as e:
-#     if e[0] == erron.EPERM:
-#         sys.exit("jou need to have root privileges to run omv-rpc script")
+# def serialize2file(listofjsonsobj: list, path = testOutputFilePath + "outputUser.json"):
+#     with open(path, "w+") as jsonfile:
+#         print("serializing files")
+#         for entry in listofjsonsobj:
+#             json.dump(entry, jsonfile)
 # omvUser = {
 #     "name" : str,
 #     "uid" : int,
