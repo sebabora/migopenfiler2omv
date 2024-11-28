@@ -127,7 +127,8 @@ def migrateUsers(ctx,  whiteList, blackList, usrmigfile, dryrun, secretlistfile,
         users.importBlacklistedUsers(blackList)
         rlog.info(f'Size of black user list {len(users.blacklistedUsers)}')
 
-    users.cleanofUsersList(True)
+    users.cleanUserList(users.ofUsersList, users.blacklistedUsers)
+    # users.cleanofUsersList(True)
     rlog.info(f'Cleaned user list entries: {len(users.ofUsersList)}')
 
     # NOTE: this has to run !!

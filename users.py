@@ -219,18 +219,82 @@ def importPasswordList(csvFilePath = "testfiles/secrets.csv", nameFieldNum = 2, 
         print("file dosn't exists")
         sys.exit(1)
 
+def cleanUserList(userList : list, blackListed: list, manual = False) -> list:
+    blackListedUserNames = []
+    blackListedUserNames = [ user.get("name") for user in blackListed ]
+    print(blackListedUserNames)
 
-def cleanofUsersList(manual = True) -> None:
-
+def cleanofUsersList(manual = True) -> list:
     if len(blacklistedUsers) > 0:
-        rlog.info(f'Blacklist contains {len(blacklistedUsers)} users')
+        rlog.debug(f'Blacklist contains {len(blacklistedUsers)} users')
+
+        indexesToRemove = []
+
+        cleanedUserslist = []
+        for user in ofUsersList:
+            for buser in blacklistedUsers: 
+                if user['name'].lower() == buser['name'].lower():
+                    rlog.info(f'Blacklisted user on the list {user["name"]}')
+                    ofUsersList.remove(user)
+                # else:
+                #     rlog.info(f'Not on the list')
+                    # print(user)
+                # rlog.info(f'ofUsersList len {len(ofUsersList)}')
+
+        rlog.info(f'Number of indexes to remove {len(indexesToRemove)}')
+    return []
+    # if len(blacklistedUsers) > 0:
+    #     rlog.debug(f'Blacklist contains {len(blacklistedUsers)} users')
+    #
+    #     indexesToRemove = []
+    #
+    #     cleanedUserslist = []
+    #     for buser in blacklistedUsers:
+    #         for user in ofUsersList:
+    #             if user['name'].lower() == buser['name'].lower():
+    #                 print("DUPA")
+    #                 indexesToRemove.append(ofUsersList.index(user))
+    #                 break
+    #             else:
+    #                 print(user)
+    #     rlog.info(f'Number of indexes to remove {len(indexesToRemove)}')
+    # return []
+        
+    # if len(blacklistedUsers) > 0:
+    #     rlog.debug(f'Blacklist contains {len(blacklistedUsers)} users')
+    #
+    #     indexesTo remove
+    #     cleanedUserslist = []
+    #     for buser in blacklistedUsers:
+    #         for user in ofUsersList:
+    #             if user['name'].lower() == buser['name'].lower():
+    #                 cleanedUserslist.append(
+    #                 rlog.info(f'Removing user {user['name']}')
+    #                 break
+                
+        # rlog.debug(f'Cleaned user list size: {len(cleanedUserslist)}')
+# ver 2
+    # if len(blacklistedUsers) > 0:
+    #     rlog.debug(f'Blacklist contains {len(blacklistedUsers)} users')
+    #     itemsToRemove = []
+    #     cleanedUserslist = []
+    #     for buser in blacklistedUsers:
+    #         cleanedUserslist[:] = [user for user in ofUsersList if user.get('name').lower() == buser['name'].lower()]
+    #     rlog.debug(f'Cleaned user list size: {len(cleanedUserslist)}')
+
+    return cleanedUserslist
+# ver 1
+    if len(blacklistedUsers) > 0:
+        rlog.debug(f'Blacklist contains {len(blacklistedUsers)} users')
         for user in ofUsersList:
             for buser in blacklistedUsers:
                 if user["name"].lower() == buser["name"].lower():
+                    # why does this not remove users ?
+                    print("DUPA")
                     ofUsersList.remove(user)
                     break
     elif len(whiteListedUsers) > 0:
-        rlog.info(f'Whitelist contains {len(blacklistedUsers)} users')
+        rlog.debug('Whitelist contains {len(blacklistedUsers)} users')
         if manual: print("Removing user manualy")
         for user in ofUsersList:
             delUser = True
@@ -261,7 +325,7 @@ def cleanofUsersList(manual = True) -> None:
         # printAllUsers(ofUsersList)        
     else:
         rlog.info("No users whitelist or blacklist has been provided")
-        print("noting to remove")
+        rlog.warning(f'Noting to remove')
     
 def cleanofGroupsList(manual = False) -> None:
     ## based on users sice we dont need groups with no users
