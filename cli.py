@@ -132,7 +132,6 @@ def migrateUsers(ctx,  whiteList, blackList, usrmigfile, dryrun, secretlistfile,
     rlog.info(f'Cleaned user list entries: {len(users.ofUsersList)}')
 
     # NOTE: this has to run !!
-
     if secretlistfile:
         users.importPasswordList(secretlistfile)
     else:
@@ -140,7 +139,14 @@ def migrateUsers(ctx,  whiteList, blackList, usrmigfile, dryrun, secretlistfile,
 
     if dryrun:
         users.printAllUsers(ofUsersList)
-    
+
+
+    # FIX: remove
+    # click.echo(str(userMigrationFile)) 
+
+    # TODO: consider asking what to do 
+    users.exportUsersToOmvImport()
+    users.exportGroupsToOmvImport()
     users.exportUsers(str(userMigrationFile))
     
     rlog.info(f'Creating {len(users.ofUsersList)} users')
@@ -471,6 +477,34 @@ def testDataCopy(ctx, src, dst, share_name):
         rlog.debug(f'Destination:{dstPathStr}{share_name}/')
 
     copyShareData(Path(f'{srcPathStr}{share_name}/'), Path(f'{dstPathStr}{share_name}/'), TRUE)
+    
+@test.command(name='smbAccessRights')
+@click.argument('targetip', nargs=1)
+@click.argument('testRightsAccessFile', type=click.Path(exists=True, dir_okay=False))
+@click.option('--user', '-u', type=(str))
+@click.option('--password', '-p', prompt=True, hide_input=True, confirmation_prompt=True)
+@click.option('--domain_controller', '-dc', type=(str))
+@click.option('--port', default=445, show_default=True, type=(int))
+@click.option('--encrypt', '-en', is_flag=True, show_default=True, default=False)
+@click.option('--connection_timeout', '-ct', show_default=True, type=(int), default=60)
+@click.pass_context
+def testSambaShareAccessRights(ctx, targetip, testRightsAccessFile, 
+                               user, password, port, encrypt, connection_timeout):
+    if testRightsAccessFile:
+        # read user access file for comparing
+        pass
+    else:
+        if user:
+            rlog.info(f'Testing single user')
+        else:
+            if not password:
+                rlog.warning(f'Empty password')
+                sys.exit(-1)
+
+    
+    # get remote share list
+    # 
+    
 
 @test.command(name='all')
 @click.argument('action', type=click.Choice(TEST_ACTIONS))

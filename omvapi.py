@@ -136,6 +136,34 @@ def getOmvUsers(ctx) -> list:
         print('Decoding JSON has failed')
     print("echo")
 
+def cleanOmvUsers(ctx, exception : str, confirm = True):
+    out = omvRpcCmd("'UserMgmt' 'deleteUser'")
+    listOfOmvUsers = getOmvUsers(ctx)
+    try:
+        for user in listOfOmvUsers:
+            print_json(user_json)
+
+            if user["name"] != exception:
+                continue
+            else:
+                user_json = json.loads(user)
+                if.obj["DEBUG"]: print_json(user_json)
+                # FIX: is this command corect ?
+                out = omvRpcCmd("'UserMgmt' 'deleteUser'")
+
+        # omvUsers = json.loads(out)
+        # if ctx.obj["DEBUG"]: print_json(json.dumps(omvUsers, indent=2))
+        # # if debug: print("TYP:", type(omvUsers))
+        # 
+        # if len(omvUsers) > 0:
+        #     printOmvUsers(omvUsers)
+        # else:
+        #     print("EMPTY LIST")
+    except ValueError:
+        print('Decoding JSON has failed')
+    print("echo")
+    
+
 # NOTE: zrobione
 def printOmvGroups(omvGroupsList : list):
     tab = Table(title="OpenMediaVault groups")

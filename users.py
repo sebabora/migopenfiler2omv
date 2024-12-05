@@ -1,5 +1,6 @@
 from collections import OrderedDict
 from ldif import LDIFParser,LDIFWriter
+from pathlib import Path
 #import ldif
 from pprint import pprint
 import subprocess
@@ -72,11 +73,21 @@ def parseGroup(entry):
     omvGroup["gid"] = entry.get("gidNumber")
     omvGroup["tags"] = []
     ## TODO : to lower case
-    omvGroup["members"] = entry.get("memberUid")
+    members = entry.get("memberUid")
+    if not members == None:
+        members = [ m.lower() for m in members ]
+        omvGroup["members"] = members
+    else:
+        omvGroup["members"] = []
+    # FIX: REMOVE
+    # print(f'{omvGroup["groupname"]}, members: {omvGroup["members"]}')
+    # print(f'dl: {len(omvGroup["members"])}')
+
+    # rlog.info(f'Parsed group {omvGroup["groupname"]} {omvGroup["gid"]} {omvGroup["tags"]} {omvGroup["members"]}')
 
     ## TODO: somekind verbose printing
     #
-    rlog.debug("Parsing user")
+    # rlog.debug("Parsing user")
 
     return omvGroup
 
@@ -104,6 +115,7 @@ def parseLDIFile(path = "testfiles/ofusersdb.ldif"):
                     ofGroupsList.append(parseGroup(record))
                     continue
             else:
+                # FIX: remove
                 continue
         
         # pprint(record)
@@ -218,11 +230,19 @@ def importPasswordList(csvFilePath = "testfiles/secrets.csv", nameFieldNum = 2, 
     else:
         print("file dosn't exists")
         sys.exit(1)
+# FIX: test this 
+def cleanUserList(userList : list, blackListed: list, compareKey: str, manual = False) -> list:
+    if len(blackListed) > 0:
 
-def cleanUserList(userList : list, blackListed: list, manual = False) -> list:
-    blackListedUserNames = []
-    blackListedUserNames = [ user.get("name") for user in blackListed ]
-    print(blackListedUserNames)
+        blackListedUserNames = []
+        blackListedUserNames = [ user.get("name") for user in blackListed ]
+
+        print(blackListedUserNames)
+        cleanedList = [ user for user in userList if user['name'] not in blackListedUserNames]
+    else:
+        return userList
+
+    return cleanedList
 
 def cleanofUsersList(manual = True) -> list:
     if len(blacklistedUsers) > 0:
@@ -371,7 +391,12 @@ def cleanofGroupsList(manual = False) -> None:
         print("noting to remove")
 
 def exportUsers(path = testOutputFilePath + "importUsersToOmv.csv"):
-    
+# users import f
+# <username>;<uid>;<tags>;<email>;<password>;<shell>;<groupname,groupname,...>;<disallowusermod>
+    # check if file exist 
+    # ask user for interaction
+    # override file by default
+    # write user to file
     fnames = []
     if len(ofUsersList) > 0:
         first = ofUsersList[0]
@@ -399,16 +424,147 @@ def exportUsers(path = testOutputFilePath + "importUsersToOmv.csv"):
 
             dwriter.writerow(row)
 
-# users import format to openmediavault gui
+def exportUserList(path = testOutputFilePath + "blacklistedusers.csv"):
+# users import f
 # <username>;<uid>;<tags>;<email>;<password>;<shell>;<groupname,groupname,...>;<disallowusermod>
     # check if file exist 
     # ask user for interaction
     # override file by default
     # write user to file
-    # 
+    fnames = []
+    if len(ofUsersList) > 0:
+        first = ofUsersList[0]
+        fnames = first.keys()
+    else:
+        rlog.error("Empty Group list")
+    ## TODO: exit program with error
+
+    with open(path, "w", newline='') as csvfile:
+        # dwriter = csvfile.writer(csvfile)
+
+        dwriter = csv.DictWriter(csvfile, 
+                                 fieldnames=fnames,
+                                 delimiter=";",
+                                 quoting=csv.QUOTE_MINIMAL,
+                                 dialect="excel")
+        dwriter.writeheader()
+        row = {}
+        for u in ofUsersList:
+            for key, val in u.items():
+                if type(val) is list:
+                    # is first value has , at the bigining ?
+                    row[key] = ",".join(val)
+                else:
+                    row[key] = val
+
+            dwriter.writerow(row)
+
+def exportUsersToOmvImport(path = testOutputFilePath + "importUsersToOmv.csv"):
+# users import f
+# <username>;<uid>;<tags>;<email>;<password>;<shell>;<groupname,groupname,...>;<disallowusermod>
+    # check if file exist 
+    # ask user for interaction
+    # override file by default
+    # write user to file
+    fnames = []
+    if len(ofUsersList) > 0:
+        first = ofUsersList[0]
+        fnames = first.keys()
+        print(fnames)
+    else:
+        rlog.error("Empty Group list")
+    ## TODO: exit program with error
+
+    with open(path, "w", newline='') as csvfile:
+        # dwriter = csvfile.writer(csvfile)
+
+        dwriter = csv.DictWriter(csvfile, 
+                                 fieldnames=fnames,
+                                 delimiter=";",
+                                 quoting=csv.QUOTE_MINIMAL,
+                                 dialect="excel")
+        dwriter.writeheader()
+        row = {}
+        low_uid_warned = False
+        for u in ofUsersList:
+            row["name"] = u.get("name")
+            # FIX: modern system uses minmum of 1000 istead of 500 id
+            # if (["uid"] < 1000) and low_uid_warned: 
+            #     rlog.warning("modern system uses minmum of 1000 istead of 500 id")
+            row["uid"] = u.get("uid")
+            row["email"] = u.get("email", "")
+            tagsStr = ""
+            # if u["name"] == "sbtest":
+            #     print("sdafs")
+            #     u["tags"] = ["ksiegowosc", "silowania", "swietlica"]
+            #     print(u["tags"])
+
+            # print(len(u["tags"]))
+            for tag in u.get("tags"):
+                if u.get("tags")[-1] == tag:
+                    tagsStr += tag
+                else:
+                    tagsStr += tag + ","
+                    print(u.get("tags")[-1])
+            row["tags"] = tagsStr
+            
+            row["password"] = u.get("password")
+            row["shell"] = u.get("shell")
+            
+            groupsStr = ""
+            for group in u.get("groups"):
+                if u.get("groups")[-1] == group:
+                    groupsStr += group
+                else:
+                    groupsStr += group + ","
+
+            row["groups"] = groupsStr
+            row["disallowusermod"] = u.get("disallowusermod")
+
+            dwriter.writerow(row)
+
+def exportGroupsToOmvImport(path = testOutputFilePath + "importGroupsToOmv_test.csv"):
+# users import f
+# <username>;<uid>;<tags>;<email>;<password>;<shell>;<groupname,groupname,...>;<disallowusermod>
+    # check if file exist 
+    # ask user for interaction
+    # override file by default
+    # write user to file
+    fnames = []
+    if len(ofGroupsList) > 0:
+        first = ofGroupsList[0]
+        fnames = first.keys()
+    else:
+        rlog.error("Empty Group list")
+    ## TODO: exit program with error
+
+    # print(fnames)
+
+    with open(path, "w", newline='') as csvfile:
+        # dwriter = csvfile.writer(csvfile)
+
+        dwriter = csv.DictWriter(csvfile, 
+                                 fieldnames=fnames,
+                                 delimiter=";",
+                                 quoting=csv.QUOTE_MINIMAL,
+                                 dialect="excel")
+        dwriter.writeheader()
+        row = {}
+        low_uid_warned = False
+        for g in ofGroupsList:
+            row["groupname"] = g.get("groupname")
+            row["gid"] = ",".join(g.get("gid"))
+            row["tags"] = ",".join(g.get("tags"))
+            row["members"] = ",".join(g.get("members"))
+
+            dwriter.writerow(row)
 
 def exportGroups(path = testOutputFilePath + "importGroupsToOmv.csv"):
 
+# groups import format to openmediavault gui
+# <groupname>;<gid>;<tags>
+    # for group in GroupsList:
+    #     
     fnames = []
     if len(ofGroupsList) > 0:
         first = ofGroupsList[0]
@@ -435,10 +591,6 @@ def exportGroups(path = testOutputFilePath + "importGroupsToOmv.csv"):
                     row[key] = val
 
             dwriter.writerow(row)
-# groups import format to openmediavault gui
-# <groupname>;<gid>;<tags>
-    # for group in GroupsList:
-    #     
 
 def printAllUsers(ul: list) -> None:
     counter = 0
@@ -463,10 +615,25 @@ def printAllGroups(gl: list) -> None:
             print("members: ", group["members"]) 
 
 # def serialize2file(listofjsonsobj: list, path = testOutputFilePath + "outputUser.json"):
-#     with open(path, "w+") as jsonfile:
-#         print("serializing files")
-#         for entry in listofjsonsobj:
-#             json.dump(entry, jsonfile)
+def serializeToFile(listOfDict: list, pathToFile = Path("./testfiles/serialized.json")):
+    if pathToFile.exists() or pathToFile.is_File():
+        with open(path, "w+") as jsonfile:
+            rlog.info("Serializing to file")
+            for entry in listOfDict:
+                json.dump(entry, jsonfile)
+
+def deserializeFromFile(pathToJsonFile = Path("./testfiles/serialized.json")) -> list:
+    listOfDict = []
+    if pathToJsonFile.exists() or pathToJsonFile.is_File():
+        with open(path, "r") as jsonfile:
+            rlog.info("Deserialize json... file")
+            entry = json.load(jsonfile)
+            listOfDict.append(entry)
+    rlog.debug(f'Size of list read {len(listOfDict)}')
+    return listOfDict
+#
+# ----------------------------------------------------------------------------------
+#
 # omvUser = {
 #     "name" : str,
 #     "uid" : int,
@@ -487,3 +654,6 @@ def printAllGroups(gl: list) -> None:
 #     "comment" : str,
 #     "members" : list[str],
 # }
+parseLDIFile()
+exportUsersToOmvImport()
+exportGroupsToOmvImport()
