@@ -12,9 +12,10 @@ from rich import print_json
 import click
 
 def errorPrinter(response : dict):
-    err = response["error"]
-    print("Error code:", err["code"])
-    print("Error message:", err["message"])
+    rlog.error("ERROR")
+    # err = response["error"]
+    # print("Error code:", err["code"])
+    # print("Error message:", err["message"])
 
 # NOTE: zrobione
 def omvRpcCmd(cmd = "-h"):
@@ -137,20 +138,22 @@ def getOmvUsers(ctx) -> list:
     print("echo")
 
 def cleanOmvUsers(ctx, exception : str, confirm = True):
-    out = omvRpcCmd("'UserMgmt' 'deleteUser'")
     listOfOmvUsers = getOmvUsers(ctx)
     try:
-        for user in listOfOmvUsers:
-            print_json(user_json)
+        printOmvUsers(listOfOmvUsers)
 
-            if user["name"] != exception:
-                continue
-            else:
-                user_json = json.loads(user)
-                if.obj["DEBUG"]: print_json(user_json)
-                # FIX: is this command corect ?
-                out = omvRpcCmd("'UserMgmt' 'deleteUser'")
-
+        
+        # for user in listOfOmvUsers:
+        #     print_json(user_json)
+        #
+        #     if user["name"] != exception:
+        #         continue
+        #     else:
+        #         user_json = json.loads(user)
+        #         if.obj["DEBUG"]: print_json(user_json)
+        #         # FIX: is this command corect ?
+        #         out = omvRpcCmd("'UserMgmt' 'deleteUser'")
+        #
         # omvUsers = json.loads(out)
         # if ctx.obj["DEBUG"]: print_json(json.dumps(omvUsers, indent=2))
         # # if debug: print("TYP:", type(omvUsers))
@@ -424,25 +427,46 @@ def deleteShares(shareList : list, debug = True) -> bool:
 
 def createOmvUser(user : dict, debug = True):
     # request = {"start" : start, "limit" : limit, "sortfiled" : "name", "stordir" : "ASC" }
+    # request = {"name" : user["name"], "groups" : user["groups"], 
+    #            "password" : user["password"],
+    #            "email" : user["email"],
+    #            "disallowusermod" : user["disallowusermod"],
+    #            "sshpubkeys" : user["sshpubkeys"]}
+# bad
     request = {"name" : user["name"], "groups" : user["groups"], 
                "password" : user["password"],
                "email" : user["email"],
                "disallowusermod" : user["disallowusermod"],
                "sshpubkeys" : user["sshpubkeys"]}
-
+    
     request_json = json.dumps(request, ensure_ascii=True, separators=(', ', ':'))
     cmd_request = f"'UserMgmt' 'setUser' '{request_json}'"
+
+    rlog.info(f"cmd request '{cmd_reuest}'")
+    
     print("cmd_request:", cmd_request)
-    response_raw = omvRpcCmd(cmd_request)
     try:
-        response = json.loads(response_raw)
-        # FIX: use errorPrinter
-        if response["response"] == "null":
-            err = response["error"]
-            print("Error code:", err["code"])
-            print("Error message:", err["message"])
+        response_raw = omvRpcCmd(cmd_request)
+        print("problem is bellow")
+        if not type(respone_raw) == dict:
+            response = json.loads(response_raw)
         else:
-            print("created a user")
+            raise ValueError("Json not returned")
+        print("problem is above")
+        # FIX: use errorPrinter
+        # print_json(response)
+        print(type(response))
+        print(response)
+        
+        # if not type(response_raw)
+        # errorPrinter(response)
+        # if response["response"] == "null":
+        #     print("ERRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR")
+        #     # err = response["error"]
+        #     # print("Error code:", err["code"])
+        #     # print("Error message:", err["message"])
+        # else:
+        #     print("created a user")
     except ValueError:
         print('Decoding JSON has failed')
     # omvRpcCmd('UserMgmt ' + json.dumps(user, sort_keys=False, default=str))
@@ -467,9 +491,9 @@ def createOmvGroups(listOfGroups : list, debug = True):
         createOmvGroup(group, debug)
 # NOTE: done
 def deleteOmvUser(user : dict, debug = True) -> bool:
-    request = {"name" : user["name"]}
+    # request = {"name" : user["name"]}
 
-    request_json = json.dumps(request, ensure_ascii=True, separators=(', ', ':'))
+    request_json = json.dumps(user, ensure_ascii=True, separators=(', ', ':'))
     cmd_request = f"'UserMgmt' 'deleteUser' '{request_json}'"
 
     response_raw = omvRpcCmd(cmd_request)

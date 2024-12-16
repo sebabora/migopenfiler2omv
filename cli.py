@@ -311,9 +311,10 @@ def test(ctx):
     
 @test.command(name='user')
 @click.argument('action', type=click.Choice(TEST_ACTIONS))
+@click.option('--user-id', '-ui', type=click.INT)
 # @click.option('--user')
 @click.pass_context
-def testUser(ctx, action):
+def testUser(ctx, action, user_id):
     test_user = {"name" :"rpcUsr",
                  "groups" : ["rpcUsrGr","users"],
                  "password" : "dupamaryski",
@@ -349,7 +350,7 @@ def testGroup(ctx, subject):
                   "gid" : "1045",
                   "members" : ["rpcUsr"]
                   }
-    
+# FIX : copia 
     if subject == 'creation':
         rlog.info("Creating test user")
         omvapi.createOmvUser(test_group)
@@ -512,6 +513,8 @@ def testSambaShareAccessRights(ctx, targetip, testRightsAccessFile,
 @click.pass_context
 def testShare(ctx, action):
     click.echo("share")
+
+    # FIX: copia
     if action == 'creation':
         rlog.info("Creating test user")
         omvapi.createOmvUser(test_share)

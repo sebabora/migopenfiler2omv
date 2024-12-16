@@ -591,7 +591,7 @@ def exportGroups(path = testOutputFilePath + "importGroupsToOmv.csv"):
                     row[key] = val
 
             dwriter.writerow(row)
-
+# NOTE: rewrite
 def printAllUsers(ul: list) -> None:
     counter = 0
     if len(ul) > 0:
@@ -606,6 +606,7 @@ def printAllUsers(ul: list) -> None:
         print("No users has been found")
         sys.exit(1)
 
+# NOTE: rewrite
 def printAllGroups(gl: list) -> None:
     
     if len(gl) > 0:
@@ -654,6 +655,6 @@ def deserializeFromFile(pathToJsonFile = Path("./testfiles/serialized.json")) ->
 #     "comment" : str,
 #     "members" : list[str],
 # }
-parseLDIFile()
-exportUsersToOmvImport()
-exportGroupsToOmvImport()
+# parseLDIFile()
+# exportUsersToOmvImport()
+# exportGroupsToOmvImport()
