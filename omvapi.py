@@ -11,11 +11,16 @@ from rich import print_json
 # from click import Context
 import click
 
-def errorPrinter(response : dict):
-    rlog.error("ERROR")
-    # err = response["error"]
-    # print("Error code:", err["code"])
-    # print("Error message:", err["message"])
+def errorPrinter(response):
+    if response == dict:
+        rlog.error("ERROR")
+        err = response["error"]
+        print("Error code:", err["code"])
+        print("Error message:", err["message"])
+    elif response == str:
+        rlog.error(response)
+    else:
+        rlog.error(f'Undefined error, return type is {type(response)}')
 
 # NOTE: zrobione
 def omvRpcCmd(cmd = "-h"):
@@ -32,6 +37,268 @@ def omvRpcCmd(cmd = "-h"):
         except subprocess.CalledProcessError as e:
             print("[ERROR]: Error running omv-rpc")
             proc = e.output.decode()
+# FIX: czy to jest potrzebne ?
+def printListOfSystemUsers(omvUsersList : list):
+    for user in omvUsersList:
+        print(user)
+
+# NOTE: zrobione
+def getOmvSystemUsers(ctx) -> list:
+    out = omvRpcCmd("'UserMgmt' 'enumerateSystemUsers'")
+
+    try:
+        omvSystemUsersList = json.loads(out)
+
+        if len(omvSystemUsersList) > 0:
+            if ctx.obj["DEBUG"]: print_json(json.dumps(omvSystemUsersList , indent=2))
+            printOmvUsers(omvSystemUsersList)
+            # if debug: printListOfSystemUsers(omvSystemUsersList)
+            # if debug: printListOfSystemUser(omvSystemUsersList) ## TODO: remove
+            return omvSystemUsersList
+        else:
+            ## TODO: loging object
+            print("empty list")
+            return []
+    except ValueError:
+        print('Decoding JSON has failed')
+
+# NOTE: zrobione
+def printOmvUsers(omvUsersList : list):
+    # omvCmdPrintAllUsers = "'UserMgmt' 'enumerateUsers'"
+    # omvRpcCmd(omvCmdPrintAllUsers)
+    tab = Table(title="OpenMediaVault users")
+    tab.add_column("Name", justify="right", style="cyan", no_wrap=True)
+    tab.add_column("uid", justify="center", style="green", no_wrap=True)
+    tab.add_column("gid", justify="center")
+    tab.add_column("dir", justify="left")
+    tab.add_column("shell", justify="left")
+    tab.add_column("groups", justify="right")
+
+    click.echo(f'TYPE: {type(omvUsersList)}')
+    click.echo(f'Found {len(omvUsersList)} users')
+    for user in omvUsersList:
+        tab.add_row(user['name'], 
+                    str(user['uid']), 
+                    str(user['gid']), 
+                    user['dir'], 
+                    user['shell'], 
+                    ", ".join(user['groups'])
+                    )
+        # print("User: ", user['name'])
+
+    console = Console()
+    console.print(tab)
+
+# NOTE: zrobione
+def getOmvUsers(ctx) -> list:
+    out = omvRpcCmd("'UserMgmt' 'enumerateUsers'")
+
+    click.echo(f'Type: {type(out)}')
+    try:
+        omvUsers = json.load(out)
+        if ctx.obj["DEBUG"]: print_json(json.dumps(omvUsers, indent=2))
+        # if debug: print("TYP:", type(omvUsers))
+        
+        if len(omvUsers) > 0:
+            printOmvUsers(omvUsers)
+        else:
+            rlog.error(f'User list is empty ')
+    except ValueError:
+        rlog.error('Deoding JSON has failed')
+
+#NOTE: done, tested
+def createOmvUser(user : dict, debug = True):
+    request = {"name" : user["name"], "groups" : user["groups"], 
+               "password" : user["password"],
+               "email" : user["email"],
+               "disallowusermod" : user["disallowusermod"],
+               "sshpubkeys" : user["sshpubkeys"]}
+    
+    request_json = json.dumps(request, ensure_ascii=True, separators=(', ', ':'))
+    cmd_request = f"'UserMgmt' 'setUser' '{request_json}'"
+
+    if debug:
+        rlog.debug(f"cmd request: '{cmd_request}'")
+    
+    try:
+        # return type bytes if everthing is ok, NoneType otherwise
+        response_raw = omvRpcCmd(cmd_request)
+        if response_raw is not None:
+            response = json.loads(response_raw)
+            if debug:
+                rlog.debug(f'response type: {type(response)}')
+                rlog.debug(f'response: {response}')
+        else:
+            errorPrinter("Response is None")
+    except ValueError:
+        rlog.error(f'Decoding JSON has failed')
+    # omvRpcCmd('UserMgmt ' + json.dumps(user, sort_keys=False, default=str))
+#NOTE: done, tested
+def createOmvUsers(listOfUsers : list, debug = True):
+    rlog.info(f'Creating {len(listOfUsers)} users')
+    for user in listOfUsers:
+        createOmvUser(user, debug)
+#NOTE: done, tested
+def deleteOmvUser(user : dict, debug = True) -> bool:
+    # request = {"name" : user["name"]}
+
+    request_json = json.dumps(user, ensure_ascii=True, separators=(', ', ':'))
+    cmd_request = f"'UserMgmt' 'deleteUser' '{request_json}'"
+
+    if debug:
+        rlog.debug(f"cmd request: '{cmd_request}'")
+
+    try:
+        response_raw = omvRpcCmd(cmd_request)
+        
+        if response_raw is not None:
+            response = json.loads(response_raw)
+            if debug:
+                rlog.debug(f'response type: {type(response)}')
+                rlog.debug(f'response: {response}')
+            return True
+        else:
+            print(response_raw)
+            errorPrinter("Response is None")
+            return False
+        # response = json.loads(response_raw)
+        # if response["response"] == "null":
+        #     errorPrinter(response)
+        #     return True
+        # else:
+        #     rlog.info(f'Deleting user: {user["name"]}')
+            return False
+    except ValueError:
+        print('Decoding JSON has failed')
+
+def cleanOmvUsers(ctx, exception : str, confirm = True):
+    listOfOmvUsers = getOmvUsers(ctx)
+    try:
+        # printOmvUsers(listOfOmvUsers)
+        click.echo(f'type {type(listOfOmvUsers)}')
+        rlog.info(f'Found {len(listOfOmvUsers)} users to delete')
+
+        for user in listOfOmvUsers:
+            username = user["name"]
+            if click.confirm(f'Remove user {username}'):
+                click.echo(f'REMOVING USER: {username}')
+        
+        # for user in listOfOmvUsers:
+        #     print_json(user_json)
+        #
+        #     if user["name"] != exception:
+        #         continue
+        #     else:
+        #         user_json = json.loads(user)
+        #         if.obj["DEBUG"]: print_json(user_json)
+        #         # FIX: is this command corect ?
+        #         out = omvRpcCmd("'UserMgmt' 'deleteUser'")
+        #
+        # omvUsers = json.loads(out)
+        # if ctx.obj["DEBUG"]: print_json(json.dumps(omvUsers, indent=2))
+        # # if debug: print("TYP:", type(omvUsers))
+        # 
+        # if len(omvUsers) > 0:
+        #     printOmvUsers(omvUsers)
+        # else:
+        #     print("EMPTY LIST")
+    except ValueError:
+        print('Decoding JSON has failed')
+    print("echo")
+
+def deleteAllOmvUsers(omvUsersList: dict, exception : str) -> bool:
+    result = False
+    for user in omvUsersList:
+        if user["name"] == exception:
+            continue
+        else:
+            result = result or deleteOmvUser(user)
+            rlog.info(f'Deleting user: {user["name"]}')
+
+    return result
+
+def createOmvGroup(group : dict, debug = True):
+    request = {"name" : group["name"],
+               "gid" : group["password"],
+               "comment" : group["comment"],
+               # FIX: pamietaj o wypelnieniu tej grupy
+               "members" : group["members"]}
+
+    request_json = json.dumps(request, ensure_ascii=True, separators=(', ', ':'))
+    cmd_request = f"'groupMgmt' 'setgroup' '{request_json}'"
+    print("cmd_request:", cmd_request)
+
+def createOmvGroups(listOfGroups : list, debug = True):
+    for group in listOfGroups:
+        createOmvGroup(group, debug)
+
+def deleteOmvGroup(group: dict, debug = True) -> bool:
+    request = {"name" : group["name"]}
+
+    request_json = json.dumps(request, ensure_ascii=True, separators=(', ', ':'))
+    cmd_request = f"'groupMgmt' 'setgroup' '{request_json}'"
+
+    response_raw = omvRpcCmd(cmd_request)
+    try:
+        response = json.loads(response_raw)
+        if response["response"] == "null":
+            errorPrinter(response)
+            return False
+        else:
+            print("Deleted user:", group["name"])
+            return True
+    except ValueError:
+        print('Decoding JSON has failed')
+
+            
+# def deleteAllOmvGroups(group : dict, exception : str) -> bool:
+def deleteAllOmvGroups(group : dict, listExceptionNames : list, confirm = False) -> bool:
+
+    result = False
+    for group in omvGroupsList:
+        if group["name"] == exception:
+            continue
+        else:
+            result = result or deleteOmvGroup(group)
+            rlog.info(f'Deleting group: {group["name"]}')
+    return result
+
+    
+
+# NOTE: zrobione
+def printOmvGroups(omvGroupsList : list):
+    tab = Table(title="OpenMediaVault groups")
+    tab.add_column("Group Name", justify="right", style="cyan", no_wrap=True)
+    tab.add_column("uid", justify="center", style="green", no_wrap=True)
+    tab.add_column("members", justify="right")
+    tab.add_column("system", justify="left")
+    
+    print("Found %s openmediavault groups" % len(omvGroupsList))
+    for group in omvGroupsList:
+        tab.add_row(group['name'], 
+                    str(group['gid']), 
+                    ", ".join(group['members']),
+                    str(group['system']), 
+                    )
+    console = Console()
+    console.print(tab)
+    
+# NOTE: zrobione
+def getOmvGroups(ctx, systemGroups = False) -> list:
+    if systemGroups: out = omvRpcCmd("'UserMgmt' 'enumerateSystemGroups'")
+    else: 
+        out = omvRpcCmd("'UserMgmt' 'enumerateGroups'")
+    try:
+        omvGroups = json.loads(out)
+        if ctx.obj["DEBUG"]: print_json(json.dumps(omvGroups, indent=2))
+
+        if len(omvGroups) > 0:
+            printOmvGroups(omvGroups)
+        else:
+            print("EMPTY LIST")
+    except ValueError:
+        print('Decoding JSON has failed')
+        
 # NOTE: zrobione
 def printListofFilesystems(listoffs : list):
     for fs in listoffs:
@@ -70,136 +337,6 @@ def getListOfFilesystems(ctx) -> list:
         print('Decoding JSON has failed')
         return []
         ## TODO: exit program with code 1 
-# FIX: czy to jest potrzebne ?
-def printListOfSystemUsers(omvUsersList : list):
-    for user in omvUsersList:
-        print(user)
-
-# NOTE: zrobione
-def getOmvSystemUsers(ctx) -> list:
-    out = omvRpcCmd("'UserMgmt' 'enumerateSystemUsers'")
-
-    try:
-        omvSystemUsersList = json.loads(out)
-
-        if len(omvSystemUsersList) > 0:
-            if ctx.obj["DEBUG"]: print_json(json.dumps(omvSystemUsersList , indent=2))
-            printOmvUsers(omvSystemUsersList)
-            # if debug: printListOfSystemUsers(omvSystemUsersList)
-            # if debug: printListOfSystemUser(omvSystemUsersList) ## TODO: remove
-            return omvSystemUsersList
-        else:
-            ## TODO: loging object
-            print("empty list")
-            return []
-    except ValueError:
-        print('Decoding JSON has failed')
-
-# NOTE: zrobione
-def printOmvUsers(omvUsersList : list):
-    # omvCmdPrintAllUsers = "'UserMgmt' 'enumerateUsers'"
-    # omvRpcCmd(omvCmdPrintAllUsers)
-    tab = Table(title="OpenMediaVault users")
-    tab.add_column("Name", justify="right", style="cyan", no_wrap=True)
-    tab.add_column("uid", justify="center", style="green", no_wrap=True)
-    tab.add_column("gid", justify="center")
-    tab.add_column("dir", justify="left")
-    tab.add_column("shell", justify="left")
-    tab.add_column("groups", justify="right")
-    
-    print("Found %s openmediavault users" % len(omvUsersList))
-    for user in omvUsersList:
-        tab.add_row(user['name'], 
-                    str(user['uid']), 
-                    str(user['gid']), 
-                    user['dir'], 
-                    user['shell'], 
-                    ", ".join(user['groups'])
-                    )
-        # print("User: ", user['name'])
-
-    console = Console()
-    console.print(tab)
-
-# NOTE: zrobione
-def getOmvUsers(ctx) -> list:
-    out = omvRpcCmd("'UserMgmt' 'enumerateUsers'")
-    try:
-        omvUsers = json.loads(out)
-        if ctx.obj["DEBUG"]: print_json(json.dumps(omvUsers, indent=2))
-        # if debug: print("TYP:", type(omvUsers))
-        
-        if len(omvUsers) > 0:
-            printOmvUsers(omvUsers)
-        else:
-            print("EMPTY LIST")
-    except ValueError:
-        print('Decoding JSON has failed')
-    print("echo")
-
-def cleanOmvUsers(ctx, exception : str, confirm = True):
-    listOfOmvUsers = getOmvUsers(ctx)
-    try:
-        printOmvUsers(listOfOmvUsers)
-
-        
-        # for user in listOfOmvUsers:
-        #     print_json(user_json)
-        #
-        #     if user["name"] != exception:
-        #         continue
-        #     else:
-        #         user_json = json.loads(user)
-        #         if.obj["DEBUG"]: print_json(user_json)
-        #         # FIX: is this command corect ?
-        #         out = omvRpcCmd("'UserMgmt' 'deleteUser'")
-        #
-        # omvUsers = json.loads(out)
-        # if ctx.obj["DEBUG"]: print_json(json.dumps(omvUsers, indent=2))
-        # # if debug: print("TYP:", type(omvUsers))
-        # 
-        # if len(omvUsers) > 0:
-        #     printOmvUsers(omvUsers)
-        # else:
-        #     print("EMPTY LIST")
-    except ValueError:
-        print('Decoding JSON has failed')
-    print("echo")
-    
-
-# NOTE: zrobione
-def printOmvGroups(omvGroupsList : list):
-    tab = Table(title="OpenMediaVault groups")
-    tab.add_column("Group Name", justify="right", style="cyan", no_wrap=True)
-    tab.add_column("uid", justify="center", style="green", no_wrap=True)
-    tab.add_column("members", justify="right")
-    tab.add_column("system", justify="left")
-    
-    print("Found %s openmediavault groups" % len(omvGroupsList))
-    for group in omvGroupsList:
-        tab.add_row(group['name'], 
-                    str(group['gid']), 
-                    ", ".join(group['members']),
-                    str(group['system']), 
-                    )
-    console = Console()
-    console.print(tab)
-    
-# NOTE: zrobione
-def getOmvGroups(ctx, systemGroups = False) -> list:
-    if systemGroups: out = omvRpcCmd("'UserMgmt' 'enumerateSystemGroups'")
-    else: 
-        out = omvRpcCmd("'UserMgmt' 'enumerateGroups'")
-    try:
-        omvGroups = json.loads(out)
-        if ctx.obj["DEBUG"]: print_json(json.dumps(omvGroups, indent=2))
-
-        if len(omvGroups) > 0:
-            printOmvGroups(omvGroups)
-        else:
-            print("EMPTY LIST")
-    except ValueError:
-        print('Decoding JSON has failed')
 # TODO: debug and table fix based on needed data for rpc api
 def printSharedFolders(omvSharedFoldersList : list, print_uuid=False):
     print("Found %s openmediavault shares" % len(omvSharedFoldersList))
@@ -326,6 +463,7 @@ def deleteSharedFolder(sharedFolder : dict, debug = True) -> bool:
 def deleteSharedFolders(sharedFoldersList : list, ctx) -> bool:
     for sharedFolder in sharedFoldersList:
         deleteSharedFolder(sharedFolder)
+
 # NOTE: done
 def printShares(omvShareList : list, print_uuid=False):
     print("Found %s openmediavault shares" % len(omvShareList))
@@ -365,14 +503,6 @@ def printShares(omvShareList : list, print_uuid=False):
             # getSharesPermissions(share)
         console.print(tab2)
 
-def getSharesPermissions(share : dict, debug = True) -> bool:
-    # NOTE: check if exist
-    # make support for erros and printing it
-    # out = omvRpcCmd("'ShareMgmt' 'getPrivileges' '".join(share['uuid']
-    # out = omvRpcCmd("'ShareMgmt' 'getPrivileges' '{0}'".format(share['uuid']))
-    # print("'ShareMgmt' 'getPrivileges' '"{0}:{1}\"}\'".format("name", share['uuid']))
-    # print("'ShareMgmt' 'getPrivileges' '"{0}:{1}\"}\'".format("name", share['uuid']))
-    pass
 
 def getShares(ctx, print_uuid = False) -> list:
     omvShareList = []
@@ -425,125 +555,12 @@ def deleteShare(share : dict, debug = True) -> bool:
 def deleteShares(shareList : list, debug = True) -> bool:
     return True
 
-def createOmvUser(user : dict, debug = True):
-    # request = {"start" : start, "limit" : limit, "sortfiled" : "name", "stordir" : "ASC" }
-    # request = {"name" : user["name"], "groups" : user["groups"], 
-    #            "password" : user["password"],
-    #            "email" : user["email"],
-    #            "disallowusermod" : user["disallowusermod"],
-    #            "sshpubkeys" : user["sshpubkeys"]}
-# bad
-    request = {"name" : user["name"], "groups" : user["groups"], 
-               "password" : user["password"],
-               "email" : user["email"],
-               "disallowusermod" : user["disallowusermod"],
-               "sshpubkeys" : user["sshpubkeys"]}
-    
-    request_json = json.dumps(request, ensure_ascii=True, separators=(', ', ':'))
-    cmd_request = f"'UserMgmt' 'setUser' '{request_json}'"
-
-    rlog.info(f"cmd request '{cmd_reuest}'")
-    
-    print("cmd_request:", cmd_request)
-    try:
-        response_raw = omvRpcCmd(cmd_request)
-        print("problem is bellow")
-        if not type(respone_raw) == dict:
-            response = json.loads(response_raw)
-        else:
-            raise ValueError("Json not returned")
-        print("problem is above")
-        # FIX: use errorPrinter
-        # print_json(response)
-        print(type(response))
-        print(response)
-        
-        # if not type(response_raw)
-        # errorPrinter(response)
-        # if response["response"] == "null":
-        #     print("ERRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR")
-        #     # err = response["error"]
-        #     # print("Error code:", err["code"])
-        #     # print("Error message:", err["message"])
-        # else:
-        #     print("created a user")
-    except ValueError:
-        print('Decoding JSON has failed')
-    # omvRpcCmd('UserMgmt ' + json.dumps(user, sort_keys=False, default=str))
-
-def createOmvUsers(listOfUsers : list, debug = True):
-    for user in listOfUsers:
-        createOmvUser(user, debug)
-
-def createOmvGroup(group : dict, debug = True):
-    request = {"name" : group["name"],
-               "gid" : group["password"],
-               "comment" : group["comment"],
-               # FIX: pamietaj o wypelnieniu tej grupy
-               "members" : group["members"]}
-
-    request_json = json.dumps(request, ensure_ascii=True, separators=(', ', ':'))
-    cmd_request = f"'groupMgmt' 'setgroup' '{request_json}'"
-    print("cmd_request:", cmd_request)
-
-def createOmvGroups(listOfGroups : list, debug = True):
-    for group in listOfGroups:
-        createOmvGroup(group, debug)
-# NOTE: done
-def deleteOmvUser(user : dict, debug = True) -> bool:
-    # request = {"name" : user["name"]}
-
-    request_json = json.dumps(user, ensure_ascii=True, separators=(', ', ':'))
-    cmd_request = f"'UserMgmt' 'deleteUser' '{request_json}'"
-
-    response_raw = omvRpcCmd(cmd_request)
-    try:
-        response = json.loads(response_raw)
-        if response["response"] == "null":
-            errorPrinter(response)
-            return True
-        else:
-            print("Deletedl group:", user["name"])
-            return False
-    except ValueError:
-        print('Decoding JSON has failed')
-
-def deleteOmvGroup(group: dict, debug = True) -> bool:
-    request = {"name" : group["name"]}
-
-    request_json = json.dumps(request, ensure_ascii=True, separators=(', ', ':'))
-    cmd_request = f"'groupMgmt' 'setgroup' '{request_json}'"
-
-    response_raw = omvRpcCmd(cmd_request)
-    try:
-        response = json.loads(response_raw)
-        if response["response"] == "null":
-            errorPrinter(response)
-            return False
-        else:
-            print("Deleted user:", group["name"])
-            return True
-    except ValueError:
-        print('Decoding JSON has failed')
-
-def deleteAllOmvUsers(omvUsersList: dict, exception : str) -> bool:
-    result = False
-    for user in omvUsersList:
-        if user["name"] == exception:
-            continue
-        else:
-            result = result or deleteOmvUser(user)
-            rlog.info(f'Deleting user: {user["name"]}')
-
-    return result
-            
-def deleteAllOmvGroups(group : dict, exception : str) -> bool:
-    result = False
-    for group in omvGroupsList:
-        if group["name"] == exception:
-            continue
-        else:
-            result = result or deleteOmvGroup(group)
-            rlog.info(f'Deleting group: {group["name"]}')
-    return result
+def getSharesPermissions(share : dict, debug = True) -> bool:
+    # NOTE: check if exist
+    # make support for erros and printing it
+    # out = omvRpcCmd("'ShareMgmt' 'getPrivileges' '".join(share['uuid']
+    # out = omvRpcCmd("'ShareMgmt' 'getPrivileges' '{0}'".format(share['uuid']))
+    # print("'ShareMgmt' 'getPrivileges' '"{0}:{1}\"}\'".format("name", share['uuid']))
+    # print("'ShareMgmt' 'getPrivileges' '"{0}:{1}\"}\'".format("name", share['uuid']))
+    pass
 

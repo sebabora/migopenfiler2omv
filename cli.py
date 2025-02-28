@@ -14,7 +14,7 @@ from richlogging import logger as rlog
 @click.group()
 @click.option('--debug/--no-debug', default=False)
 @click.option('--usage', is_flag=True, help='Print commont usage of tool')
-@click.version_option(version='0.0.1')
+@click.version_option(version='0.0.2')
 @click.help_option()
 @click.pass_context
 def cli(ctx, debug, usage):
@@ -315,6 +315,7 @@ def test(ctx):
 # @click.option('--user')
 @click.pass_context
 def testUser(ctx, action, user_id):
+    # TODO: corrent rlog.info ?
     test_user = {"name" :"rpcUsr",
                  "groups" : ["rpcUsrGr","users"],
                  "password" : "dupamaryski",
@@ -338,6 +339,9 @@ def testUser(ctx, action, user_id):
 
         # NOTE: is this make sens ?
     elif action == 'migration':
+
+        # FIX: remove this (only for testing)
+        omvapi.cleanOmvUsers(ctx, "sborawski", True)
         click.echo("Test user migration")
 
 @test.command(name='group')
@@ -531,7 +535,27 @@ def testShare(ctx, action):
         # NOTE: is this make sens ?
     elif action == 'migration':
         click.echo("Test user migration")
+# FIX: remove this in final version
+@test.command(name='cleaning')
+@click.argument('subject', type=click.Choice(TEST_SUBJECT))
+@click.pass_context
+def testCleaning(ctx, subject):
 
+    if subject == 'users':
+        # omvapi.cleanOmvUsers(ctx, 'sborawski', False)
+        omvapi.deleteAllOmvUsers(ctx, 'sborawski', False)
+    elif subject == 'group':
+        omvapi.deleteAllOmvGroups(ctx, 'sborawski', False)
+        pass
+    elif subject == 'sharedFolders':
+        omvapi.deleteAllSharedFolders(ctx, 'sborawski', False)
+        pass
+    elif subject == 'shares':
+        omvapi.deleteAllShares(ctx, 'sborawski', False)
+        pass
+    else:
+        rlog.warning('Unrecognized cleaning tests')
+## main function
 
 if __name__ == '__main__':
     cli()

@@ -1,6 +1,12 @@
 import logging
+from datetime import datetime
 
 from rich.logging import RichHandler
+
+# class CustomFormatter(logging.Formatter):
+#     def formatTime(self, record, datefmt=None):
+#         dt = datetime.fromtimestamp(record.created)
+#         return dt.strftime('%H:%M:%S,%f')[:5]
 
 logger = logging.getLogger(__name__)
 
@@ -14,9 +20,12 @@ file_handler.setLevel(logging.DEBUG)
 
 # the formatter determines what our logs will look like
 fmt_shell = '%(message)s'
+fmt_shell_date = '[%H:%M:%S]'
 fmt_file = '%(levelname)s %(asctime)s [%(filename)s:%(funcName)s:%(lineno)d] %(message)s'
 
-shell_formatter = logging.Formatter(fmt_shell)
+shell_formatter = logging.Formatter(fmt_shell, fmt_shell_date, style="%")
+# shell_formatter = CustomFormatter(fmt_shell)
+shell_formatter.default_time_format = '%s.%03d'
 file_formatter = logging.Formatter(fmt_file)
 
 # here we hook everything together
